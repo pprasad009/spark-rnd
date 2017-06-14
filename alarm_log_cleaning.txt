@@ -1,0 +1,34 @@
+###
+	You can't apply .as[class_name] to the dataframes directly if the column names are not matching with case class
+	So first you've to convert the dataframe by renaming it to correct column names and then apply case class on top
+###	
+
+#Define case class
+case class alarm_log("timestamp" :String,  "dt" :String,  "sequence_number" :String,  "project" :String,  "alarm_id" :String,  "alarm_class" :String,  "resource" :String,  "logged_by" :String,  "reference" :String,  "prev_state" :String,  "log_action" :String,  "final_state" :String,  "alarm_message" :String,  "generation_time" :String,  "timestamp_utc" :String,  "generation_time_utc" :String)
+
+#Load csv in ds
+val alarmlogs=spark.read.format("csv").load("s3://ttl-lodha/Scada/alarm_log/01_02_2017_1.csv")
+ 
+ #drop last NULL column
+val alarms= alarmlogs.drop("_c16")
+ 
+#rename columns in df as per the case class
+val alarm_df=alarms.toDF("time_1","dt","sequence_number","project","alarm_id","alarm_class","resource","logged_by","reference","prev_state","log_action","final_state","alarm_message","generation_time","timestamp_utc","generation_time_utc") 
+
+#apply case class
+val alarm_ds=alarm_df.as[alarm_log]
+
+#Identify records with incorrect 'header' fields
+val alarm_head=alarm_ds.filter(alarm_ds("sequence_number").startsWith("timestamp"))
+
+#remove incorrect headers from DS
+val alarm_log_ds=alarm_ds.except(alarm_head)
+
+#Performance tuning
+spark.conf.set("spark.sql.shuffle.partitions",20)
+ 
+#persist the table to Hive
+alarm_log_ds.write.saveAsTable("alarm_log")
+
+
+

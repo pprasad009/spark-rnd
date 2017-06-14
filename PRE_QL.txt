@@ -1,0 +1,60 @@
+val from_pattern="dd.MM.yyyy hh:mm:ss"
+
+val alarm_log=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/ALARM_LOG.csv")
+val alarm=alarm_log
+alarm.cache.count()
+val alarm_log_ts = alarm.withColumn("timestamp",unix_timestamp(alarm("timestamp"),from_pattern).cast("timestamp")).withColumn("generation_time",unix_timestamp(alarm("generation_time"),from_pattern).cast("timestamp")).withColumn("timestamp_utc",unix_timestamp(alarm("timestamp_utc"),from_pattern).cast("timestamp")).withColumn("generation_time_utc",unix_timestamp(alarm("generation_time_utc"),from_pattern).cast("timestamp")).withColumnRenamed("timestamp","timestamp_1")
+alarm_log_ts.write.saveAsTable("alarm_log")
+
+
+val andon=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/ANDON.csv")
+andon.write.saveAsTable("andon")
+
+val andon_stops=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/ANDON_STOPS.csv")
+val andon_stops_ts = andon_stops.withColumn("timestamp",unix_timestamp(andon_stops("timestamp"),from_pattern).cast("timestamp")).withColumn("_TIME",unix_timestamp(andon_stops("_TIME"),from_pattern).cast("timestamp")).withColumn("timestamp_utc",unix_timestamp(andon_stops("timestamp_utc"),from_pattern).cast("timestamp")).withColumnRenamed("timestamp","timestamp_1")
+andon_stops_ts.write.saveAsTable("andon_stops")
+
+val prod_run_time=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/PROD_RUN_TIME.csv")
+val prod_run_time_ts = prod_run_time.withColumn("timestamp",unix_timestamp(prod_run_time("timestamp"),from_pattern).cast("timestamp")).withColumnRenamed("timestamp","timestamp_1")
+prod_run_time_ts.write.saveAsTable("prod_run_time_ts")
+
+val points=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/POINTS.csv")
+points.write.saveAsTable("points")
+
+val data_log=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/DATA_LOG.csv")
+val data_log_ts = data_log.withColumn("timestamp",unix_timestamp(data_log("timestamp"),from_pattern).cast("timestamp")).withColumn("_TIME",unix_timestamp(data_log("_TIME"),from_pattern).cast("timestamp")).withColumn("timestamp_utc",unix_timestamp(data_log("timestamp_utc"),from_pattern).cast("timestamp")).withColumnRenamed("timestamp","timestamp_1")
+data_log_ts.write.saveAsTable("data_log")
+
+
+
+spark.sql("create table setAlarms as SELECT a.resource, a.alarm_id, a.timestamp_1, a.alarm_message, a.alarm_class, a.final_state, a.generation_time, a.log_action FROM ALARM_LOG AS a WHERE  a.log_action='G'")
+spark.sql("create table resetAlarms as SELECT a.resource, a.alarm_id, a.timestamp_1, a.alarm_message, a.alarm_class, a.final_state, a.generation_time, a.log_action FROM ALARM_LOG AS a WHERE  a.log_action='R'")
+spark.sql("create table Alarms as SELECT s.alarm_id AS ALMID, s.timestamp_1 AS start_time, r.timestamp_1 AS end_time, s.alarm_message AS ALMMESS, coalesce(nvl(r.log_action,'G'),r.log_action) AS FSTATE,  s.alarm_class AS ALMCLASS, s.resource AS RES FROM SetAlarms AS s LEFT JOIN ResetAlarms AS r ON s.generation_time = r.generation_time union all SELECT r.alarm_id AS ALMID, s.timestamp_1 AS start_time, r.timestamp_1 AS end_time, coalesce(nvl(s.alarm_message, r.alarm_message), s.alarm_message) AS ALMMESS, r.log_action AS FSTATE,  r.alarm_class AS ALMCLASS, r.resource AS RES FROM SetAlarms AS s RIGHT JOIN ResetAlarms AS r ON s.generation_time = r.generation_time AND s.alarm_id = r.alarm_id")
+
+
+val tblElapsedTimes=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/csv_in/tblElapsedTimes.csv")
+tblElapsedTimes.write.saveAsTable("tblElapsedTimes")
+
+val tblElapsedTimesSum=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/csv_in/tblElapsedTimesSum.csv")
+tblElapsedTimesSum.write.saveAsTable("tblElapsedTimesSum")
+
+val tblGroupedTimes=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/csv_in/tblGroupedTimes.csv")
+tblGroupedTimes.write.saveAsTable("tblGroupedTimes")
+
+val tblGroupedTimesSum=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/csv_in/tblGroupedTimesSum.csv")
+tblGroupedTimesSum.write.saveAsTable("tblGroupedTimesSum")
+
+val tblRowNames=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/csv_in/tblRowNames.csv")
+tblRowNames.write.saveAsTable("tblRowNames")
+
+val tblRowNamesSum=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/csv_in/tblRowNamesSum.csv")
+tblRowNamesSum.write.saveAsTable("tblRowNamesSum")
+
+val tblSumGroups=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/csv_in/tblSumGroups.csv")
+tblSumGroups.write.saveAsTable("tblSumGroups")
+
+val tblColumnNames=spark.read.format("csv").option("header","true").option("inferschema","true").load("s3://ttl-lodha/Scada/csv_in/tblColumnNames.csv")
+tblColumnNames.write.saveAsTable("tblColumnNames")
+
+
+
